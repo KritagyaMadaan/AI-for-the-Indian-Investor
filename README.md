@@ -42,7 +42,9 @@ Think of it as a **Bloomberg Terminal meets ChatGPT**, tuned for the Indian mark
 | 📰 **AI News Analysis** | Fetches and contextualizes latest Indian market news via NewsData.io |
 | 🔍 **Opportunity Radar Engine** | Scans bulk/block deals, insider trades, corporate filings, and SEBI/NSE announcements |
 | 🎯 **High-Conviction Signal Finder** | Generates 5–8 scored trading signals (0–100 conviction) with full institutional reasoning |
-| 🎬 **Video Report Generator** | Auto-generates market recap videos with charts, TTS narration, and animated visuals |
+| 📈 **Chart Pattern Intelligence** | Candlestick (25d, `mplfinance`) + live 5-min heartbeat graph (`plotly`) — detects Doji, Engulfing, Inside Bar patterns |
+| 🎬 **AI Video Broadcast Studio** | Full 5-stage pipeline: data fetch → chart render → LLaMA script → neural TTS → `moviepy` assembly → `.mp4` output |
+| 🏦 **FII/DII & IPO Feeder** | Live institutional flow data and recent NSE listings injected as context into video narrations |
 | 💬 **Natural Language Queries** | Ask anything: *"Should I buy Reliance?"* or *"What's happening with NIFTY 50?"* |
 | 📊 **Market Sentiment Engine** | Real-time sentiment scoring: Very Bullish / Bullish / Neutral / Bearish |
 
@@ -51,38 +53,69 @@ Think of it as a **Bloomberg Terminal meets ChatGPT**, tuned for the Indian mark
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│             React + TypeScript Frontend          │
-│           (Vite · index.html · /src · /public)   │
-└──────────────────────┬──────────────────────────┘
-                       │ API calls
-                       ▼
-┌─────────────────────────────────────────────────┐
-│              TypeScript Backend Server           │
-│                    (server.ts)                   │
-└──────┬─────────────────────────┬────────────────┘
-       │                         │
-       ▼                         ▼
-┌──────────────┐        ┌────────────────────────┐
-│  MarketGPT   │        │  OpportunityRadar       │
-│  Multi-Agent │        │  Engine                 │
-│  (Python)    │        │  (Python)               │
-│              │        │                         │
-│ ┌──────────┐ │        │ ┌─────────┐ ┌────────┐ │
-│ │Price-Scan│ │        │ │ Bulk /  │ │Insider │ │
-│ │(yfinance)│ │        │ │ Block   │ │ Trades │ │
-│ └──────────┘ │        │ │ Deals   │ └────────┘ │
-│ ┌──────────┐ │        │ └─────────┘ ┌────────┐ │
-│ │Web-Scanner│ │        │ ┌─────────┐ │Filings │ │
-│ │(NewsData) │ │        │ │ NSE     │ │& News  │ │
-│ └──────────┘ │        │ │ nselib  │ └────────┘ │
-│ ┌──────────┐ │        │ └─────────┘            │
-│ │Flow-      │ │        └───────────┬────────────┘
-│ │Screener   │ │                    │
-│ └──────────┘ │        ┌────────────▼────────────┐
-└──────┬───────┘        │   LLaMA 3.3-70B (Groq)  │
-       └────────────────►   Signal Synthesis Brain │
-                        └─────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                    React + TypeScript Frontend                        │
+│               (Vite · index.html · /src · /public)                   │
+└─────────────────────────────┬────────────────────────────────────────┘
+                              │ REST API calls
+                              ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    TypeScript Backend Server                          │
+│                          (server.ts)                                 │
+│         Spawns Python subprocesses · Routes requests · Serves        │
+│                  generated videos from /public/                      │
+└────┬──────────────────┬──────────────────┬───────────────────────────┘
+     │                  │                  │
+     ▼                  ▼                  ▼
+┌─────────────┐  ┌────────────────┐  ┌──────────────────────────────┐
+│  MarketGPT  │  │ Opportunity    │  │      Video Generator         │
+│ Multi-Agent │  │ Radar Engine   │  │    (video_generator.py)      │
+│   (Python)  │  │  (Python)      │  │                              │
+│             │  │                │  │  ┌──────────────────────┐   │
+│ ┌─────────┐ │  │ ┌────────────┐ │  │  │  1. Data Fetcher      │   │
+│ │Price-   │ │  │ │Bulk/Block  │ │  │  │  yfinance: 3mo OHLCV │   │
+│ │Scan     │ │  │ │Deals       │ │  │  │  + 5m intraday data  │   │
+│ │yfinance │ │  │ └────────────┘ │  │  └──────────┬───────────┘   │
+│ └─────────┘ │  │ ┌────────────┐ │  │             │               │
+│ ┌─────────┐ │  │ │Insider     │ │  │  ┌──────────▼───────────┐   │
+│ │Web-     │ │  │ │Trades      │ │  │  │  2. Chart Pattern     │   │
+│ │Scanner  │ │  │ └────────────┘ │  │  │  Intelligence         │   │
+│ │NewsData │ │  │ ┌────────────┐ │  │  │                       │   │
+│ └─────────┘ │  │ │Corporate   │ │  │  │  mplfinance:          │   │
+│ ┌─────────┐ │  │ │Filings     │ │  │  │  Candlestick (25d)   │   │
+│ │Flow-    │ │  │ └────────────┘ │  │  │  + Volume Bars        │   │
+│ │Screener │ │  │ ┌────────────┐ │  │  │                       │   │
+│ └─────────┘ │  │ │FII/DII     │ │  │  │  plotly:              │   │
+│             │  │ │Activity    │ │  │  │  Live Heartbeat       │   │
+│ ┌─────────┐ │  │ │(nselib)    │ │  │  │  Momentum Graph       │   │
+│ │Synthesis│ │  │ └────────────┘ │  │  │  (5m intraday)        │   │
+│ │Brain    │ │  │ ┌────────────┐ │  │  └──────────┬───────────┘   │
+│ │LLaMA-3.3│ │  │ │IPO Tracker │ │  │             │               │
+│ └─────────┘ │  │ └────────────┘ │  │  ┌──────────▼───────────┐   │
+└──────┬──────┘  └───────┬────────┘  │  │  3. AI Script Writer  │   │
+       │                 │           │  │  LLaMA 3.3-70B        │   │
+       │          ┌──────▼────────┐  │  │  35-sec broadcast     │   │
+       │          │ LLaMA 3.3-70B │  │  │  script (EN / HI)     │   │
+       └─────────►│ Signal Brain  │  │  │  FII/IPO/Pattern      │   │
+                  │ JSON Signals  │  │  │  context flags        │   │
+                  └───────────────┘  │  └──────────┬───────────┘   │
+                                     │             │               │
+                                     │  ┌──────────▼───────────┐   │
+                                     │  │  4. TTS Narration     │   │
+                                     │  │  edge-tts             │   │
+                                     │  │  en-US-AriaNeural     │   │
+                                     │  │  hi-IN-SwaraNeural    │   │
+                                     │  └──────────┬───────────┘   │
+                                     │             │               │
+                                     │  ┌──────────▼───────────┐   │
+                                     │  │  5. Video Assembly    │   │
+                                     │  │  moviepy              │   │
+                                     │  │  Pexels motion BG     │   │
+                                     │  │  Pillow text overlays │   │
+                                     │  │  Chart clips (fade)   │   │
+                                     │  │  → .mp4 @ 24fps       │   │
+                                     │  └──────────────────────┘   │
+                                     └──────────────────────────────┘
 ```
 
 ---
@@ -109,11 +142,49 @@ Located in `opportunity_radar_engine.py`. Runs unprompted to surface hidden oppo
   - Short/Medium/Long-term Impact
   - Source citations (Exchange Filing, Bulk Deal Row, SEBI Filing, News Report)
 
-### `VideoGenerator` — Market Recap Filmmaker
-Located in `video_generator.py`. Auto-creates shareable video reports using:
-- `matplotlib` / `mplfinance` — candlestick charts
-- `gTTS` / `pyttsx3` — text-to-speech narration
-- `moviepy` — video assembly & export
+### `VideoGenerator` — Market Broadcast Studio
+Located in `video_generator.py`. The most visually impressive module — a fully automated, AI-narrated video broadcast pipeline that produces a polished `.mp4` market recap for any NSE ticker in under 60 seconds. Here's how the 5-stage pipeline works:
+
+**Stage 1 — Data Fetcher**
+Downloads two data streams simultaneously via `yfinance`: 3 months of daily OHLCV (for charting) and real-time 5-minute intraday bars (for the live heartbeat graph). Also resolves common ticker aliases (e.g., `NIFTY 50` → `^NSEI`).
+
+**Stage 2 — Chart Pattern Intelligence**
+This is where technical analysis becomes visual. Two chart types are generated conditionally based on user-selected intelligence flags:
+
+| Flag | Chart | Library | Detail |
+|---|---|---|---|
+| Always on | **Live Heartbeat / Momentum** | `plotly` (dark theme) | 5-min intraday closing price as a glowing blue line — shows same-day momentum at a glance |
+| `--pattern=true` | **Candlestick + Volume** | `mplfinance` | Last 25 trading days rendered in `charles` style with volume bars — surfaces patterns like Doji, Engulfing, Inside Bar |
+
+Both charts are exported as high-resolution `.png` assets for video compositing.
+
+**Stage 3 — AI Script Writer**
+Calls `LLaMA 3.3-70B` (via Groq) with the live price and three optional context flags to write a tight 35-second (70–80 word) broadcast script:
+- `--fii=true` → injects Net FII/DII flow sentiment into the script
+- `--ipo=true` → references recent NSE listing activity
+- `--pattern=true` → instructs the LLM to comment on technical structure and candle patterns
+
+Supports both **English** and **Hindi** (language flag passed as CLI arg).
+
+**Stage 4 — Neural TTS Narration**
+Uses `edge-tts` (Microsoft Neural TTS, free) to convert the AI script to broadcast-quality audio:
+- 🇬🇧 English → `en-US-AriaNeural`
+- 🇮🇳 Hindi → `hi-IN-SwaraNeural`
+
+**Stage 5 — Video Assembly**
+`moviepy` composites the final `.mp4` at 24fps:
+- **Background**: Pexels API fetches a live motion video (trading floor / finance city / data analytics) — falls back to a dark `#09090B` base if unavailable
+- **Chart clips**: Momentum graph plays for the first half, candlestick (if enabled) fades in for the second half — both with FadeIn/FadeOut transitions
+- **Text overlays**: `Pillow` renders two persistent overlay bars — a header (`MARKET SENTINEL AI BROADCAST`) and a live ticker strip at the bottom
+- **Output**: `{SYMBOL}_custom_news.mp4` saved to `/public/generated_videos/` and served directly by the TypeScript backend
+
+### `MarketIntelligenceFeeder` — FII/DII & IPO Data Pipeline
+Located in `market_intelligence_feeder.py`. A lightweight but critical data module that pipes two live feeds from NSE into the broader system:
+
+- **FII/DII Trading Activity** — last 5 days of net foreign and domestic institutional flows via `nselib.capital_market`
+- **IPO Tracker** — recent NSE equity listings pulled from the live equity list
+
+This data is injected as context into the `VideoGenerator`'s AI script (via the `--fii` and `--ipo` flags) to ensure narrated videos reflect the actual institutional climate, not just price action.
 
 ---
 
@@ -170,6 +241,7 @@ Create a `.env.local` file in the root directory:
 GEMINI_API_KEY=your_gemini_api_key_here
 GROQ_API_KEY=your_groq_api_key_here
 NEWSDATA_API_KEY=your_newsdata_api_key_here
+PEXELS_API_KEY=your_pexels_api_key_here
 ```
 
 ### 3. Install Frontend Dependencies
@@ -208,7 +280,14 @@ echo "Should I buy TCS right now?" | python market_gpt_multi_agent.py
 python opportunity_radar_engine.py
 ```
 
-Both scripts output clean JSON to stdout, suitable for piping into the TypeScript backend.
+**Video Generator** (produce a narrated `.mp4` broadcast for any ticker):
+```bash
+# python video_generator.py <SYMBOL> <LANGUAGE> <FII_FLAG> <IPO_FLAG> <PATTERN_FLAG>
+python video_generator.py RELIANCE en true true true   # English, all intelligence on
+python video_generator.py "NIFTY 50" hi true false true  # Hindi, FII + patterns only
+```
+
+Both query scripts output clean JSON to stdout, suitable for piping into the TypeScript backend.
 
 ---
 
@@ -225,11 +304,14 @@ Both scripts output clean JSON to stdout, suitable for piping into the TypeScrip
 **AI / ML (Python)**
 - `groq` — LLaMA 3.3-70B inference (ultra-fast)
 - `google-generativeai` — Gemini API integration
-- `yfinance` — NSE/BSE stock price data
-- `nsepython` + `nselib` — NSE market data (bulk deals, insider trades, filings)
-- `gTTS` / `pyttsx3` — Text-to-speech for video generation
-- `moviepy` — Video creation
-- `mplfinance` / `plotly` / `matplotlib` — Chart generation
+- `yfinance` — NSE/BSE stock price data (daily OHLCV + 5m intraday)
+- `nsepython` + `nselib` — NSE market data (bulk deals, insider trades, filings, FII/DII)
+- `mplfinance` — Candlestick chart generation (25d, Charles style + volume)
+- `plotly` — Live intraday momentum/heartbeat graph
+- `edge-tts` — Microsoft Neural TTS (`AriaNeural` EN, `SwaraNeural` HI)
+- `moviepy` — Video assembly, clip compositing, fade effects @ 24fps
+- `Pillow` — Text overlay rendering for video broadcast bars
+- `matplotlib` — Additional chart rendering
 - `pandas` / `numpy` — Data processing
 
 ---
@@ -241,6 +323,7 @@ Both scripts output clean JSON to stdout, suitable for piping into the TypeScrip
 | [Groq](https://console.groq.com/) | LLaMA 3.3-70B inference | ✅ Yes |
 | [NewsData.io](https://newsdata.io/) | Indian market news feed | ✅ Yes |
 | [Google AI Studio](https://aistudio.google.com/) | Gemini API (frontend) | ✅ Yes |
+| [Pexels](https://www.pexels.com/api/) | Motion video backgrounds for broadcast | ✅ Yes |
 
 ---
 
