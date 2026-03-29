@@ -5,10 +5,10 @@ import { MarketGPT } from './components/MarketGPT';
 import { VideoEngine } from './components/VideoEngine';
 import { DashboardHome } from './components/DashboardHome';
 import { 
-  Search, Bell, MonitorPlay, Settings, 
+  Search, MonitorPlay, Settings, 
   ShieldAlert, Target, Bot, Video, PieChart, 
   HelpCircle, FileText, BarChart2, LayoutDashboard,
-  Menu, ChevronRight, Zap, User
+  ChevronRight, Zap, User
 } from 'lucide-react';
 
 export default function App() {
@@ -28,7 +28,7 @@ export default function App() {
       <header className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-[#0B1120] z-20 shrink-0">
         <div className="flex items-center gap-12">
           <div className="text-xl font-black text-white tracking-widest uppercase">
-            ET MARKETS SENTINEL
+            AI for Indian Investor
           </div>
           <div className="relative group hidden md:block">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
@@ -40,22 +40,14 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-6 pr-6 border-r border-slate-800/60">
-            <div className="relative">
-                <Bell className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#0B1120]" />
-            </div>
             <div className="flex items-center gap-3 bg-zinc-900 border border-slate-800 py-1.5 px-3 rounded-xl hover:bg-zinc-800 cursor-pointer transition-all">
                 <div className="w-5 h-5 rounded-full bg-slate-700 overflow-hidden ring-1 ring-slate-600 flex items-center justify-center">
                     <User className="w-3 h-3 text-slate-300" />
                 </div>
-                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Sentinel_User</span>
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Investor</span>
             </div>
-          </div>
-          <button className="text-slate-400 hover:text-white hidden lg:block">
-            <Menu className="w-5 h-5" />
-          </button>
         </div>
+
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -67,8 +59,8 @@ export default function App() {
                 <ShieldAlert className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-xl font-black text-white tracking-widest leading-none">SENTINEL</div>
-                <div className="text-[9px] text-slate-500 font-bold tracking-[0.2em] uppercase mt-1">Financial Intelligence</div>
+                <div className="text-xl font-black text-white tracking-widest leading-none">AI INVESTOR</div>
+                <div className="text-[9px] text-slate-500 font-bold tracking-[0.2em] uppercase mt-1">Indian Market Intelligence</div>
               </div>
             </div>
           </div>
