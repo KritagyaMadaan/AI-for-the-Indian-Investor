@@ -52,71 +52,67 @@ Think of it as a **Bloomberg Terminal meets ChatGPT**, tuned for the Indian mark
 
 ## 🏗️ Architecture
 
+The system is organised into four layers. Each layer communicates strictly downward — the frontend talks only to the TypeScript server, and the server spawns Python subprocesses that talk only to external APIs.
+
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                    React + TypeScript Frontend                        │
-│               (Vite · index.html · /src · /public)                   │
-└─────────────────────────────┬────────────────────────────────────────┘
-                              │ REST API calls
-                              ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    TypeScript Backend Server                          │
-│                          (server.ts)                                 │
-│         Spawns Python subprocesses · Routes requests · Serves        │
-│                  generated videos from /public/                      │
-└────┬──────────────────┬──────────────────┬───────────────────────────┘
-     │                  │                  │
-     ▼                  ▼                  ▼
-┌─────────────┐  ┌────────────────┐  ┌──────────────────────────────┐
-│  MarketGPT  │  │ Opportunity    │  │      Video Generator         │
-│ Multi-Agent │  │ Radar Engine   │  │    (video_generator.py)      │
-│   (Python)  │  │  (Python)      │  │                              │
-│             │  │                │  │  ┌──────────────────────┐   │
-│ ┌─────────┐ │  │ ┌────────────┐ │  │  │  1. Data Fetcher      │   │
-│ │Price-   │ │  │ │Bulk/Block  │ │  │  │  yfinance: 3mo OHLCV │   │
-│ │Scan     │ │  │ │Deals       │ │  │  │  + 5m intraday data  │   │
-│ │yfinance │ │  │ └────────────┘ │  │  └──────────┬───────────┘   │
-│ └─────────┘ │  │ ┌────────────┐ │  │             │               │
-│ ┌─────────┐ │  │ │Insider     │ │  │  ┌──────────▼───────────┐   │
-│ │Web-     │ │  │ │Trades      │ │  │  │  2. Chart Pattern     │   │
-│ │Scanner  │ │  │ └────────────┘ │  │  │  Intelligence         │   │
-│ │NewsData │ │  │ ┌────────────┐ │  │  │                       │   │
-│ └─────────┘ │  │ │Corporate   │ │  │  │  mplfinance:          │   │
-│ ┌─────────┐ │  │ │Filings     │ │  │  │  Candlestick (25d)   │   │
-│ │Flow-    │ │  │ └────────────┘ │  │  │  + Volume Bars        │   │
-│ │Screener │ │  │ ┌────────────┐ │  │  │                       │   │
-│ └─────────┘ │  │ │FII/DII     │ │  │  │  plotly:              │   │
-│             │  │ │Activity    │ │  │  │  Live Heartbeat       │   │
-│ ┌─────────┐ │  │ │(nselib)    │ │  │  │  Momentum Graph       │   │
-│ │Synthesis│ │  │ └────────────┘ │  │  │  (5m intraday)        │   │
-│ │Brain    │ │  │ ┌────────────┐ │  │  └──────────┬───────────┘   │
-│ │LLaMA-3.3│ │  │ │IPO Tracker │ │  │             │               │
-│ └─────────┘ │  │ └────────────┘ │  │  ┌──────────▼───────────┐   │
-└──────┬──────┘  └───────┬────────┘  │  │  3. AI Script Writer  │   │
-       │                 │           │  │  LLaMA 3.3-70B        │   │
-       │          ┌──────▼────────┐  │  │  35-sec broadcast     │   │
-       │          │ LLaMA 3.3-70B │  │  │  script (EN / HI)     │   │
-       └─────────►│ Signal Brain  │  │  │  FII/IPO/Pattern      │   │
-                  │ JSON Signals  │  │  │  context flags        │   │
-                  └───────────────┘  │  └──────────┬───────────┘   │
-                                     │             │               │
-                                     │  ┌──────────▼───────────┐   │
-                                     │  │  4. TTS Narration     │   │
-                                     │  │  edge-tts             │   │
-                                     │  │  en-US-AriaNeural     │   │
-                                     │  │  hi-IN-SwaraNeural    │   │
-                                     │  └──────────┬───────────┘   │
-                                     │             │               │
-                                     │  ┌──────────▼───────────┐   │
-                                     │  │  5. Video Assembly    │   │
-                                     │  │  moviepy              │   │
-                                     │  │  Pexels motion BG     │   │
-                                     │  │  Pillow text overlays │   │
-                                     │  │  Chart clips (fade)   │   │
-                                     │  │  → .mp4 @ 24fps       │   │
-                                     │  └──────────────────────┘   │
-                                     └──────────────────────────────┘
+Layer 1 · React + TypeScript Frontend (Vite)
+  ├── Stock Search & Live Price      WebSocket (live ticks)
+  ├── MarketGPT Chat                 POST /api/ai/agent
+  ├── Opportunity Radar Dashboard    GET  /api/radar/advanced
+  └── AI Market Video Engine         GET  /api/video/generate
+
+          ↕  REST API · WebSocket
+
+Layer 2 · TypeScript Backend (server.ts · Node.js + Express)
+  ├── WebSocket Price Streamer       Twelve Data (primary) → Yahoo Finance (fallback) · 10s poll
+  ├── REST API Router                /stock/search · /market/history · /market/patterns
+  │                                  /radar/raw-data · /news · /chat/intel
+  │                                  /market-rover/intelligence · /video/generate
+  └── Pattern Detection Engine       Golden Cross · Death Cross · Resistance Breakout
+                                     Support Breakdown · 1d/7d/30d outcome stats
+
+          ↕  spawn() Python subprocesses
+
+Layer 3 · Python AI Engines
+  ├── MarketGPT Multi-Agent          market_gpt_multi_agent.py
+  ├── Opportunity Radar Engine       opportunity_radar_engine.py
+  ├── Market Intelligence Feeder     market_intelligence_feeder.py
+  └── AI Market Video Engine         video_generator.py
+
+          ↕  External APIs & AI
+
+Layer 4 · Data Sources & AI
+  ├── LLaMA 3.3-70B                  Groq inference API
+  ├── NSE / BSE                      nselib · nsepython · yfinance
+  ├── Twelve Data                    OHLCV · real-time quotes
+  ├── NewsData.io                    country=in · category=business
+  └── Pexels + edge-tts              Motion backgrounds · Microsoft Neural TTS
 ```
+
+### AI Market Video Engine — 5-Stage Pipeline
+
+The most complex module — a fully automated broadcast pipeline that produces a narrated `.mp4` market recap for any NSE ticker in under 60 seconds.
+
+| Stage | Name | What it does |
+|---|---|---|
+| 1 | **Data Fetcher** | `yfinance`: 3mo daily OHLCV for charting + 5m intraday bars for live heartbeat; resolves aliases (`NIFTY 50` → `^NSEI`) |
+| 2 | **Chart Pattern Intelligence** | `plotly` dark: 5m intraday momentum graph (always on) · `mplfinance` Charles style: 25d candlestick + volume bars (`--pattern` flag) |
+| 3 | **AI Script Writer** | `LLaMA 3.3-70B` via Groq: 35-second script (70–80 words), EN or HI; `--fii`, `--ipo`, `--pattern` flags inject live market context |
+| 4 | **Neural TTS Narration** | `edge-tts`: `en-US-AriaNeural` (English) · `hi-IN-SwaraNeural` (Hindi); async `.mp3` export |
+| 5 | **Video Assembly** | `moviepy` @ 24fps: Pexels motion BG + `Pillow` header/ticker overlays + chart clips with FadeIn/FadeOut → `{SYMBOL}_custom_news.mp4` |
+
+### Pattern Detection Engine — Built into server.ts
+
+Four patterns detected over 2 years of daily OHLCV, with forward performance tracking:
+
+| Pattern | Trigger | Type |
+|---|---|---|
+| Golden Cross | SMA-50 crosses above SMA-200 | Bullish |
+| Death Cross | SMA-50 crosses below SMA-200 | Bearish |
+| Resistance Breakout | Price exceeds 20-day high | Bullish |
+| Support Breakdown | Price falls below 20-day low | Bearish |
+
+Each detected pattern is tagged with 1d, 7d, and 30d forward price changes, and a 7-day success rate is computed per pattern type across all historical instances.
 
 ---
 
