@@ -1,0 +1,5 @@
+{
+  "name": "ETMarkets Sentinel",
+  "description": "Real-time NSE market scanning and algorithmic pattern detection dashboard.",
+  "requestFramePermissions": []
+}
