@@ -606,8 +606,36 @@ async function startServer() {
       res.status(500).json({ error: 'Server error triggering intelligence feeder' });
     }
   });
+  app.get('/api/market/sentiment', async (req, res) => {
+    try {
+      // Fetch Nifty 50 live quote from Yahoo Finance
+      const quote = await yahooFinance.quote('^NSEI') as any;
+      const change = quote?.regularMarketChangePercent ?? 0;
+      const price = quote?.regularMarketPrice ?? null;
+      const prevClose = quote?.regularMarketPreviousClose ?? null;
 
-  // API: Video Generation
+      let label = 'Neutral';
+      let color = 'neutral'; // for frontend styling
+      if (change >= 1.5) { label = 'Strong Bullish'; color = 'green'; }
+      else if (change >= 0.4) { label = 'Bullish'; color = 'green'; }
+      else if (change <= -1.5) { label = 'Strong Bearish'; color = 'red'; }
+      else if (change <= -0.4) { label = 'Bearish'; color = 'red'; }
+
+      res.json({
+        sentiment: label,
+        color,
+        change: parseFloat(change.toFixed(2)),
+        price,
+        prevClose,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      // Fallback: still respond with a neutral value so the UI never breaks
+      res.json({ sentiment: 'Neutral', color: 'neutral', change: 0, price: null, prevClose: null, timestamp: new Date().toISOString() });
+    }
+  });
+
+
   app.get('/api/video/generate', async (req, res) => {
     const { symbol, lang, fii, ipo, pattern } = req.query;
     if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
