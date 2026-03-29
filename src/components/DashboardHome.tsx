@@ -12,12 +12,24 @@ interface DashboardHomeProps {
 
 export function DashboardHome({ onNavigate }: DashboardHomeProps) {
   const [intel, setIntel] = React.useState<any>(null);
+  const [sentiment, setSentiment] = React.useState<{ label: string; change: number; color: string } | null>(null);
+
+  const fetchSentiment = () => {
+    fetch('/api/market/sentiment')
+      .then(res => res.json())
+      .then(data => setSentiment({ label: data.sentiment, change: data.change, color: data.color }))
+      .catch(() => setSentiment({ label: 'Neutral', change: 0, color: 'neutral' }));
+  };
 
   React.useEffect(() => {
     fetch('/api/market-rover/intelligence')
       .then(res => res.json())
       .then(data => setIntel(data))
       .catch(err => console.error('Failed to fetch rover intel', err));
+
+    fetchSentiment();
+    const interval = setInterval(fetchSentiment, 60000); // refresh every 60s
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -25,15 +37,38 @@ export function DashboardHome({ onNavigate }: DashboardHomeProps) {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h2 className="text-zinc-400 text-sm font-semibold tracking-wider uppercase mb-2">Intelligence Hub</h2>
+          <h2 className="text-zinc-400 text-sm font-semibold tracking-wider uppercase mb-2">AI-Powered Market Intelligence</h2>
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Predictive alpha signals and AI synthesis for modern markets.
+            For Precision Investing
           </h1>
         </div>
-        <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5 rounded-xl self-start">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl self-start border transition-all duration-500 ${
+            sentiment?.color === 'red'
+              ? 'bg-red-500/10 border-red-500/20'
+              : sentiment?.color === 'green'
+              ? 'bg-emerald-500/10 border-emerald-500/20'
+              : 'bg-zinc-800/40 border-zinc-700/40'
+          }`}>
+          <div className={`w-2 h-2 rounded-full animate-pulse ${
+              sentiment?.color === 'red' ? 'bg-red-500' :
+              sentiment?.color === 'green' ? 'bg-emerald-500' : 'bg-zinc-500'
+            }`} />
           <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Market Sentiment</span>
-          <span className="text-emerald-500 font-black text-sm uppercase tracking-tighter">Strong Bullish</span>
+          {sentiment ? (
+            <>
+              <span className={`font-black text-sm uppercase tracking-tighter ${
+                  sentiment.color === 'red' ? 'text-red-400' :
+                  sentiment.color === 'green' ? 'text-emerald-400' : 'text-zinc-400'
+                }`}>{sentiment.label}</span>
+              <span className={`text-[10px] font-bold ${
+                  sentiment.change >= 0 ? 'text-emerald-500' : 'text-red-500'
+                }`}>
+                {sentiment.change >= 0 ? '+' : ''}{sentiment.change}%
+              </span>
+            </>
+          ) : (
+            <span className="text-zinc-600 text-xs font-bold animate-pulse">Fetching...</span>
+          )}
         </div>
       </div>
 
